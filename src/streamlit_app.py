@@ -2,13 +2,15 @@ import streamlit as st
 import os
 import time
 from datetime import datetime
+import re
 import bleach
+from bleach.css_sanitizer import CSSSanitizer
 
 # --- Import our Backend Logic ---
 # We assume these files exist from previous steps
 from ingestion import ingest_documents
 from tools import get_llm_with_tools, lookup_policy_docs, web_search_stub
-from agents import app as agent_app  # Import the graph we built
+from orchestrator import app as agent_app
 from memory_store import MemoryStore
 from langchain_core.messages import HumanMessage
 
@@ -216,18 +218,19 @@ if "topic" not in st.session_state:
     st.session_state.topic = ""
 if "interpreted_topic" not in st.session_state:
     st.session_state.interpreted_topic = ""
+if "revision_notes" not in st.session_state:
+    st.session_state.revision_notes = []
+if "feedback_status_kind" not in st.session_state:
+    st.session_state.feedback_status_kind = ""
+if "feedback_status_message" not in st.session_state:
+    st.session_state.feedback_status_message = ""
 
 
 def normalize_topic(raw_topic: str) -> str:
-    """Normalize obvious user typos to the most likely intended topic."""
+    """Normalize user input dynamically without hardcoded topic mappings."""
     cleaned = raw_topic.strip()
-    lower_cleaned = cleaned.lower()
-
-    typo_map = {
-        "nauruto": "Naruto",
-    }
-
-    return typo_map.get(lower_cleaned, cleaned)
+    cleaned = " ".join(cleaned.split())
+    return cleaned
 
 # --- HTML Sanitizer ---
 _ALLOWED_TAGS = [
@@ -244,9 +247,58 @@ _ALLOWED_ATTRS = {
     "img": ["src", "alt", "width", "height"],
 }
 
+_CSS_SANITIZER = CSSSanitizer(
+    allowed_css_properties=[
+        "background", "background-color", "background-image",
+        "color", "font-family", "font-size", "font-weight", "font-style",
+        "line-height", "letter-spacing", "text-align", "text-decoration",
+        "margin", "margin-top", "margin-right", "margin-bottom", "margin-left",
+        "padding", "padding-top", "padding-right", "padding-bottom", "padding-left",
+        "border", "border-top", "border-right", "border-bottom", "border-left",
+        "border-radius", "display", "max-width", "width", "height",
+        "box-shadow", "opacity",
+    ]
+)
+
+
+def normalize_generated_html(raw_output: str) -> str:
+    """Strip LLM wrappers (e.g. prose, code fences) and keep only HTML payload."""
+    text = (raw_output or "").strip()
+    if not text:
+        return text
+
+    # Remove markdown fences if present.
+    text = re.sub(r"^```(?:html)?\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s*```$", "", text)
+
+    # If the model prepends prose, cut to first meaningful HTML tag.
+    first_html = re.search(r"<(article|div|section|header|h1|h2|p|ul|ol)\b", text, flags=re.IGNORECASE)
+    if first_html:
+        text = text[first_html.start():]
+
+    # If there is trailing fence/prose after HTML, trim at the last closing tag.
+    last_close = max(text.rfind("</article>"), text.rfind("</div>"), text.rfind("</section>"))
+    if last_close != -1:
+        # Include the closing tag length for the matched case.
+        if text.rfind("</article>") == last_close:
+            text = text[: last_close + len("</article>")]
+        elif text.rfind("</section>") == last_close:
+            text = text[: last_close + len("</section>")]
+        else:
+            text = text[: last_close + len("</div>")]
+
+    return text.strip()
+
 def sanitize_html(html: str) -> str:
     """Strip unsafe tags/attributes (e.g. <script>) before rendering."""
-    return bleach.clean(html, tags=_ALLOWED_TAGS, attributes=_ALLOWED_ATTRS, strip=True)
+    normalized = normalize_generated_html(html)
+    return bleach.clean(
+        normalized,
+        tags=_ALLOWED_TAGS,
+        attributes=_ALLOWED_ATTRS,
+        css_sanitizer=_CSS_SANITIZER,
+        strip=True,
+    )
 
 # --- PDF Export Utility ---
 def export_as_pdf(html_content):
@@ -393,7 +445,13 @@ if st.session_state.current_step == "researching":
 
     # Run the Graph Stream
     config = {"configurable": {"thread_id": st.session_state.thread_id}}
-    inputs = {"messages": st.session_state.messages, "research_data": [], "chart_data": []}
+    inputs = {
+        "messages": st.session_state.messages,
+        "research_data": [],
+        "chart_data": [],
+        "analysis_content": "",
+        "revision_notes": [],
+    }
     
     try:
         print(f"\n[Streamlit] Starting graph for topic: '{st.session_state.topic}'")
@@ -421,7 +479,7 @@ if st.session_state.current_step == "researching":
 
             if "Writer" in event:
                 writer_output = event["Writer"]
-                st.session_state.draft_content = writer_output["messages"][-1].content
+                st.session_state.draft_content = normalize_generated_html(writer_output["messages"][-1].content)
                 with writer_status:
                     st.success("Draft Generated!")
                     st.code(st.session_state.draft_content[:200] + "...", language="html")
@@ -437,6 +495,16 @@ if st.session_state.current_step == "researching":
 if st.session_state.current_step == "reviewing":
     st.markdown('<div class="nn-section-title">Draft Review Workspace</div>', unsafe_allow_html=True)
     st.markdown('<div class="nn-section-sub">Inspect findings, validate quality, and decide approval or refinement.</div>', unsafe_allow_html=True)
+
+    if st.session_state.feedback_status_message:
+        if st.session_state.feedback_status_kind == "success":
+            st.success(st.session_state.feedback_status_message)
+        elif st.session_state.feedback_status_kind == "warning":
+            st.warning(st.session_state.feedback_status_message)
+        elif st.session_state.feedback_status_kind == "error":
+            st.error(st.session_state.feedback_status_message)
+        else:
+            st.info(st.session_state.feedback_status_message)
     
     # Interactive Visualization
     if st.session_state.chart_data:
@@ -474,12 +542,45 @@ if st.session_state.current_step == "reviewing":
         if st.button("Submit Decision"):
             config = {"configurable": {"thread_id": st.session_state.thread_id}}
             if feedback:
-                agent_app.update_state(config, {"messages": [HumanMessage(content=feedback)]})
-                for event in agent_app.stream(None, config):
-                    pass
-                state = agent_app.get_state(config)
-                st.session_state.draft_content = state.values['messages'][-1].content
-                st.session_state.chart_data = state.values.get('chart_data', [])
+                previous_draft = st.session_state.draft_content
+                st.session_state.revision_notes.append(feedback)
+                st.session_state.feedback_status_kind = "info"
+                st.session_state.feedback_status_message = "Feedback received. Starting revision cycle..."
+
+                try:
+                    with st.status("🔄 Applying feedback revision...", expanded=True) as feedback_status:
+                        feedback_status.write("Routing feedback to human approval node...")
+                        agent_app.update_state(
+                            config,
+                            {"messages": [HumanMessage(content=feedback)], "revision_notes": [feedback]},
+                            as_node="human_approval",
+                        )
+
+                        feedback_status.write("Running writer revision...")
+                        for event in agent_app.stream(None, config):
+                            if "Writer" in event:
+                                feedback_status.write("Writer produced a revised draft.")
+
+                        state = agent_app.get_state(config)
+                        revised_draft = normalize_generated_html(state.values['messages'][-1].content)
+                        st.session_state.draft_content = revised_draft
+                        st.session_state.chart_data = state.values.get('chart_data', [])
+
+                        if revised_draft.strip() == previous_draft.strip():
+                            st.session_state.feedback_status_kind = "warning"
+                            st.session_state.feedback_status_message = (
+                                "Feedback cycle completed, but the draft is unchanged. "
+                                "Try more explicit instructions (for example: 'Rewrite Executive Summary in formal tone and add 3 bullet risks')."
+                            )
+                            feedback_status.update(label="⚠️ Feedback cycle completed (no visible content change)", state="complete")
+                        else:
+                            st.session_state.feedback_status_kind = "success"
+                            st.session_state.feedback_status_message = "Feedback cycle completed and draft updated successfully."
+                            feedback_status.update(label="✅ Feedback cycle completed and applied", state="complete")
+                except Exception as e:
+                    st.session_state.feedback_status_kind = "error"
+                    st.session_state.feedback_status_message = f"Feedback cycle failed: {e}"
+
                 st.rerun()
             else:
                 st.session_state.current_step = "finished"

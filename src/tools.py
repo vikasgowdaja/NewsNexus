@@ -1,8 +1,10 @@
-import json
 import os
+import json
+import urllib.parse
+import urllib.request
 from langchain.tools import tool
 from langchain_ollama import ChatOllama
-from retrieval import retrieve_documents
+from vector_store import retrieve_documents
 
 # --- Tool 1: The RAG Tool (Enhanced with Deep Links) ---
 @tool
@@ -49,11 +51,11 @@ def web_search_stub(query: str) -> str:
     print(f"\n[Tool Called] Live Web Search for: '{clean_query}'")
     
     backend_errors = []
+    empty_backends = []
     backends = ["lite", "html"]
 
     for backend in backends:
         try:
-            from duckduckgo_search import DDGS
             with DDGS() as ddgs:
                 results = list(ddgs.text(clean_query, max_results=10, backend=backend))
 
@@ -66,22 +68,86 @@ def web_search_stub(query: str) -> str:
                     formatted_results.append(f"Title: {title}\nLink: [{title}]({link})\nSnippet: {snippet}")
                 return "\n\n---\n".join(formatted_results)
 
-            backend_errors.append(f"{backend}: no results")
+            empty_backends.append(backend)
         except Exception as e:
             backend_errors.append(f"{backend}: {e}")
+
+    # Additional fallback: DuckDuckGo news search can return results
+    # even when general text search returns empty.
+    try:
+        with DDGS() as ddgs:
+            news_results = list(ddgs.news(clean_query, max_results=10))
+
+        if news_results:
+            formatted_news = []
+            for res in news_results:
+                title = res.get("title", "Source")
+                link = res.get("url", "#")
+                snippet = res.get("body", res.get("excerpt", "No Snippet"))
+                formatted_news.append(f"Title: {title}\nLink: [{title}]({link})\nSnippet: {snippet}")
+            return "\n\n---\n".join(formatted_news)
+    except Exception as e:
+        backend_errors.append(f"news: {e}")
 
     # Last fallback: return curated RSS findings when live search is blocked.
     rss_fallback = rss_feed_search.invoke(clean_query)
     if rss_fallback and not str(rss_fallback).startswith("No matching recent RSS entries found"):
         return f"WEB: Live DuckDuckGo search unavailable. Using RSS fallback data.\n\n{rss_fallback}"
 
+    # Entity fallback: if web backends are blocked/empty, try Wikipedia summary.
+    # This avoids false conclusions like "topic has low coverage" for well-known entities.
+    wiki_title = urllib.parse.quote(clean_query.replace(" ", "_"))
+    wiki_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{wiki_title}"
+    try:
+        req = urllib.request.Request(
+            wiki_url,
+            headers={"User-Agent": "NewsNexus/1.0 (research-assistant)"},
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+
+        extract = payload.get("extract")
+        page_url = payload.get("content_urls", {}).get("desktop", {}).get("page", "https://en.wikipedia.org")
+        title = payload.get("title", clean_query)
+        if extract:
+            return (
+                "WEB: Live DuckDuckGo results unavailable/empty. "
+                "Using Wikipedia entity fallback.\n\n"
+                f"Title: {title}\n"
+                f"Link: [{title}]({page_url})\n"
+                f"Snippet: {extract}"
+            )
+    except Exception as e:
+        backend_errors.append(f"wikipedia: {e}")
+
+    # If we reached here, distinguish between outage and "no matches found".
+    # Empty results are a normal search outcome and should not be treated as outage.
+    if backend_errors and not empty_backends:
+        return (
+            "WEB: Search temporarily unavailable. "
+            "Treat this as a retrieval outage, not as factual evidence about the topic. "
+            f"Debug detail: {' | '.join(backend_errors)}"
+        )
+
+    if empty_backends or backend_errors:
+        debug_parts = []
+        if empty_backends:
+            debug_parts.append(f"empty backends: {', '.join(empty_backends)}")
+        if backend_errors:
+            debug_parts.append(f"errors: {' | '.join(backend_errors)}")
+        debug_msg = " ; ".join(debug_parts) if debug_parts else "no debug details"
+
+        return (
+            "WEB: No matching live web results found for this query right now. "
+            "Treat this as low external coverage for the exact query, not as an outage. "
+            f"Debug detail: {debug_msg}"
+        )
+
     return (
         "WEB: Search temporarily unavailable. "
         "Treat this as a retrieval outage, not as factual evidence about the topic. "
         f"Debug detail: {' | '.join(backend_errors)}"
     )
-        
-    return "WEB: Unexpected failure in web search tool."
 
 # --- Tool 3: RSS Feed Connector (Enhanced) ---
 @tool

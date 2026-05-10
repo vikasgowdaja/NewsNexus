@@ -102,37 +102,21 @@ Goal: Build a team of specialized agents with LangGraph.
 Team flow:
 Researcher -> Analyst -> Writer
 
-Key file: [src/agents.py](src/agents.py)
+Key files:
+- [src/agents.py](src/agents.py) (node definitions)
+- [src/orchestrator.py](src/orchestrator.py) (graph compilation and routing)
 
-Run:
+### 🔹 Phase 4-5: Unified Orchestration (HITL + Memory)
 
-```bash
-python src/agents.py
-```
+Goal: Run approval and memory-aware flow from a single orchestration center.
 
-### 🔹 Phase 4: Human-in-the-Loop (HITL)
-
-Goal: Pause before final publish and allow revision.
-
-Key file: [src/phase4_human_loop.py](src/phase4_human_loop.py)
-
-Run:
-
-```bash
-python src/phase4_human_loop.py
-```
-
-### 🔹 Phase 5: Memory & Persistence (Final)
-
-Goal: Avoid repeating recently covered topics.
-
+- [src/orchestrator.py](src/orchestrator.py): LangGraph orchestration with human approval routing
 - [src/memory_store.py](src/memory_store.py): archive save/retrieve
-- [src/phase5_final.py](src/phase5_final.py): full CLI flow
 
-Run:
+Run (via UI):
 
 ```bash
-python src/phase5_final.py
+python -m streamlit run src/streamlit_app.py
 ```
 
 ---
@@ -167,8 +151,8 @@ NewsNexus/
 │   ├── retrieval.py
 │   ├── tools.py
 │   ├── memory_store.py
-│   ├── phase4_human_loop.py
-│   ├── phase5_final.py
+│   ├── orchestrator.py
+│   ├── vector_store.py
 │   └── streamlit_app.py
 ├── run_all.py
 ├── requirements.txt

@@ -11,10 +11,11 @@ It is not a split frontend/backend web stack.
 What exists:
 
 - Streamlit UI and controller: `src/streamlit_app.py`
-- LangGraph multi-agent workflow: `src/agents.py`
-- CLI orchestration variants: `src/phase4_human_loop.py`, `src/phase5_final.py`
+- LangGraph orchestration center: `src/orchestrator.py`
+- Agent node definitions: `src/agents.py`
 - RAG ingestion pipeline: `src/ingestion.py`
 - Retrieval layer: `src/retrieval.py`
+- Unified vector store layer: `src/vector_store.py`
 - Tool layer for RAG, web search, and RSS search: `src/tools.py`
 - Long-term archive memory: `src/memory_store.py`
 - Local vector storage: `data/chroma_db/`, `data/archive_memory/`
@@ -57,9 +58,6 @@ Primary application entry point:
 
 Secondary runnable modules:
 
-- `python src/phase5_final.py` for CLI with memory and approval loop
-- `python src/phase4_human_loop.py` for CLI human approval flow without archive memory persistence
-- `python src/agents.py` for non-interactive graph smoke test
 - `python src/ingestion.py` to build the main vector store from PDFs
 - `python src/retrieval.py` to test retrieval against the existing vector store
 - `python src/tools.py` to test tool binding with Ollama
@@ -78,7 +76,7 @@ It performs these roles:
 3. Optionally triggers `ingest_documents()` if the main vector DB is missing.
 4. Creates a session-scoped thread ID for LangGraph state continuity.
 5. On user action, checks long-term archive memory through `MemoryStore.check_memory()`.
-6. Streams the graph in `agents.app`.
+6. Streams the graph in `orchestrator.app`.
 7. Displays research results, chart JSON, and generated HTML draft.
 8. On approval, archives the final draft through `MemoryStore.save_memory()`.
 
@@ -86,7 +84,7 @@ It performs these roles:
 
 Triggered from Streamlit button click or CLI execution:
 
-1. `agents.app.stream(...)`
+1. `orchestrator.app.stream(...)`
 2. `Researcher` node
 3. `Analyst` node
 4. `Writer` node
@@ -409,9 +407,7 @@ python -m pip install -r requirements.lock.txt
 | Streamlit App | `src/streamlit_app.py` | Main user-facing UI and orchestrator | `python -m streamlit run src/streamlit_app.py` | 8501 | Streamlit, Ollama, LangGraph, Chroma, optional PDFs, internet | Research graph, retrieval, archive memory, PDF export |
 | Ingestion Pipeline | `src/ingestion.py` | Build/update vector index from PDFs | `python src/ingestion.py` | N/A | PDFs in `data/raw_pdfs/`, Ollama embedding model, Chroma | Creates `data/chroma_db/` |
 | Retrieval Smoke Test | `src/retrieval.py` | Test semantic retrieval against the vector DB | `python src/retrieval.py` | N/A | Existing `data/chroma_db/`, Ollama embedding model | Chroma similarity search |
-| Agent Graph Demo | `src/agents.py` | Run researcher -> analyst -> writer flow without UI | `python src/agents.py` | N/A | Ollama, internet, optional Chroma DB | All tools and graph nodes |
-| Human Loop CLI | `src/phase4_human_loop.py` | CLI review and revise loop | `python src/phase4_human_loop.py` | N/A | Ollama, internet, optional Chroma DB | Research graph with approval loop |
-| Final CLI Orchestrator | `src/phase5_final.py` | CLI flow with long-term memory archive | `python src/phase5_final.py` | N/A | Ollama, Chroma archive DB, optional main Chroma DB, internet | Memory check, graph run, archive save |
+| Orchestration Center | `src/orchestrator.py` | Unified workflow with approval routing and checkpointed state | Integrated via Streamlit runtime | N/A | Ollama, internet, optional Chroma DB | Research graph with approval loop |
 | Tools Smoke Test | `src/tools.py` | Validate model tool binding | `python src/tools.py` | N/A | Ollama | Tool planning via LLM |
 | Archive Memory Test | `src/memory_store.py` | Validate archive memory persistence | `python src/memory_store.py` | N/A | Ollama embedding model, Chroma | Archive save and similarity lookup |
 | Single-Command Launcher | `run_all.py` | Prerequisite check plus Streamlit startup | `python run_all.py` | 8501 by default | Python env, Ollama CLI, models, Streamlit | Streamlit app launch |
@@ -530,58 +526,27 @@ Expected output:
 
 What it does:
 
-- Builds the core LangGraph workflow
-- Runs researcher, analyst, and writer nodes in sequence
+- Defines shared state and the researcher, analyst, and writer node logic
+- Provides reusable node behavior for the orchestration center
 
 When to run:
 
-- Agent-only smoke testing
-- Graph debugging without Streamlit
+- Imported by `src/orchestrator.py`
 
-Run command:
-
-```bash
-python src/agents.py
-```
-
-### 6.5 `src/phase4_human_loop.py`
+### 6.5 `src/orchestrator.py`
 
 What it does:
 
-- Runs the graph in CLI mode
-- Pauses for human approval or feedback
+- Central orchestration for researcher -> analyst -> writer
+- Adds human-approval node and conditional routing
+- Compiles graph with checkpointing and interrupt-before-approval behavior
 
 When to run:
 
-- Terminal-based demos
-- Approval-loop debugging without Streamlit
+- Imported by Streamlit runtime
+- Workflow-level debugging
 
-Run command:
-
-```bash
-python src/phase4_human_loop.py
-```
-
-### 6.6 `src/phase5_final.py`
-
-What it does:
-
-- Adds long-term archive memory to the CLI flow
-- Checks prior newsletters before research
-- Saves approved output back into archive memory
-
-When to run:
-
-- Full CLI execution
-- Long-term memory behavior testing
-
-Run command:
-
-```bash
-python src/phase5_final.py
-```
-
-### 6.7 `src/tools.py`
+### 6.6 `src/tools.py`
 
 What it does:
 
@@ -597,7 +562,7 @@ Run command:
 python src/tools.py
 ```
 
-### 6.8 `src/memory_store.py`
+### 6.7 `src/memory_store.py`
 
 What it does:
 

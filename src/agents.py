@@ -3,7 +3,6 @@ from datetime import datetime
 from typing import Annotated, List, TypedDict
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
-from langgraph.graph import StateGraph, END
 
 # Import our tools and LLM setup from Phase 2
 from tools import get_llm_with_tools, lookup_policy_docs, web_search_stub, rss_feed_search
@@ -15,6 +14,8 @@ class AgentState(TypedDict):
     messages: Annotated[List[BaseMessage], operator.add]
     research_data: List[str]
     chart_data: List[dict] # New: Stores structured data for Plotly
+    analysis_content: str
+    revision_notes: List[str]
 
 # Initialize Resources
 llm, llm_with_tools, tools = get_llm_with_tools()
@@ -65,7 +66,7 @@ def researcher_node(state: AgentState):
             # Fallback for Llama 3.2 schema confusion
             if not q or q == "{'type': 'string'}":
                 # Check if the LLM provided more info in the args
-                q = tool_args.get('__arg1', tool_args.get('input', 'AI Trends 2026'))
+                q = tool_args.get('__arg1', tool_args.get('input', last_message.content))
             
             # Convert to string just in case
             q = str(q)
@@ -125,6 +126,9 @@ def analyst_node(state: AgentState):
     - Be detailed, specific, and evidence-driven.
     - Do not write only 3 short trends.
     - Do not invent facts, figures, or citations.
+    - Treat retrieval diagnostics (e.g., 'HTTP 403', 'no matching live web results', backend/debug messages) as system telemetry, NOT topic facts.
+    - Do NOT conclude "the topic has low coverage" solely from tool outages or blocked endpoints.
+    - If external retrieval is weak, explicitly say: "external retrieval was limited in this run" and prioritize any valid internal/RSS/entity facts.
     - If evidence is weak, explicitly say what is uncertain.
     - If the raw data is empty or insufficient, DO NOT make up hypothetical numbers. Only extract data that is EXPLICITLY present.
 
@@ -148,7 +152,7 @@ def analyst_node(state: AgentState):
         except:
             pass
             
-    return {"messages": [response], "chart_data": chart_data}
+    return {"messages": [response], "chart_data": chart_data, "analysis_content": content}
 
 def writer_node(state: AgentState):
     """
@@ -156,11 +160,29 @@ def writer_node(state: AgentState):
     Responsibility: Format analysis into HTML while preserving deep links.
     """
     print("\n--- [Agent: Writer] is formatting the newsletter ---")
-    analyst_insight = state["messages"][-1].content
+    # Always prefer persisted analyst output so HITL feedback does not overwrite topic context.
+    analyst_insight = state.get("analysis_content", "")
+    if not analyst_insight:
+        analyst_insight = state["messages"][-1].content
+
+    primary_topic = "the user's requested topic"
+    for msg in state["messages"]:
+        if isinstance(msg, HumanMessage):
+            candidate = (msg.content or "").strip()
+            if candidate:
+                primary_topic = candidate
+                break
+
+    revision_feedback = ""
+    notes = state.get("revision_notes", [])
+    if notes:
+        revision_feedback = str(notes[-1]).strip()
+    elif state["messages"] and isinstance(state["messages"][-1], HumanMessage):
+        revision_feedback = state["messages"][-1].content.strip()
     
     prompt = f"""You are a senior editorial writer for a corporate intelligence platform.
 
-    Convert the analysis into a polished, detailed HTML report.
+    Convert the analysis into a polished, premium HTML newsletter report.
 
     The HTML must include these sections:
     - Title
@@ -172,14 +194,92 @@ def writer_node(state: AgentState):
     - Conclusion
 
     WRITING RULES:
+    - PRIMARY TOPIC LOCK: Keep the report centered on "{primary_topic}".
+    - Do not switch to a generic or unrelated domain unless the analyst evidence explicitly supports it.
+    - Treat revision feedback as style/edit instructions, not as a topic replacement.
     - Make it detailed, not minimal.
     - Use professional but readable language.
     - Expand short bullets into meaningful paragraphs where useful.
     - Preserve all links provided in the analysis (e.g., [Title](URL)).
     - Convert those links into clickable <a> tags in the HTML.
-    - Use semantic HTML such as <article>, <section>, <h1>, <h2>, <p>, <ul>, and <li>.
+        - Use semantic HTML such as <article>, <section>, <h1>, <h2>, <h3>, <p>, <ul>, and <li>.
+    - Do NOT include raw CSS, <style> tags, or stylesheet text like 'body {{ ... }}'.
+        - Apply visual styling using INLINE style attributes only (no <style> block).
+        - Output only clean semantic HTML content.
     - Keep the report clean and presentation-ready.
     - Do not fabricate citations or numbers.
+
+        VISUAL DESIGN CONTRACT (MANDATORY):
+        - Wrap everything in one <article> with inline styles for:
+            background: light gradient, max-width layout, center alignment, padding, rounded corners.
+        - Build a hero header section with:
+            <h1> title, short subtitle paragraph, and a small metadata row (topic/date/confidence note).
+        - Every major section must look like a card:
+            light background, border, padding, border-radius, margin-bottom.
+        - For Key Findings and Source Highlights:
+            use <ul>/<li> with generous spacing and subtle separators.
+        - For numbers or trend points:
+            present 2-4 compact "insight chips" using <div>/<span> with inline badges.
+        - Add a professional typography system via inline styles:
+            clear heading hierarchy, improved line-height, readable paragraph width.
+        - Preserve all source links as clickable <a> tags with visible link styling.
+        - End with a footer note block highlighting limitations/uncertainties when evidence is weak.
+        - Ensure the final HTML is visually rich in Streamlit's rendered component without external CSS.
+
+        OUTPUT TEMPLATE CONTRACT (STRICT):
+        - Follow this exact section order and keep the same outer structure.
+        - You may improve text content, but do not remove required sections.
+        - Return only HTML, no markdown fences.
+
+        REQUIRED HTML SKELETON:
+        <article style="max-width: 980px; margin: 24px auto; padding: 28px; border-radius: 18px; background: linear-gradient(180deg, #f8fbff 0%, #f3f7fc 100%); border: 1px solid #dbe7f3; color: #0f172a; font-family: 'Segoe UI', Tahoma, sans-serif; line-height: 1.65;">
+            <header style="padding: 20px; border-radius: 14px; background: #eaf2fb; border: 1px solid #d0e1f2; margin-bottom: 18px;">
+                <h1 style="margin: 0 0 8px 0; font-size: 30px; color: #0b3b67;">{{Title}}</h1>
+                <p style="margin: 0 0 10px 0; color: #334155; font-size: 15px;">{{Subtitle}}</p>
+                <div style="font-size: 13px; color: #475569;">
+                    <span style="display: inline-block; margin-right: 12px;"><strong>Topic:</strong> {{PrimaryTopic}}</span>
+                    <span style="display: inline-block; margin-right: 12px;"><strong>Date:</strong> {{Today}}</span>
+                    <span style="display: inline-block;"><strong>Evidence Status:</strong> {{EvidenceNote}}</span>
+                </div>
+            </header>
+
+            <section style="background: #ffffff; border: 1px solid #d9e4ef; border-radius: 14px; padding: 18px; margin-bottom: 14px;">
+                <h2 style="margin-top: 0; color: #0b3b67;">Executive Summary</h2>
+                <p>{{ExecutiveSummary}}</p>
+            </section>
+
+            <section style="background: #ffffff; border: 1px solid #d9e4ef; border-radius: 14px; padding: 18px; margin-bottom: 14px;">
+                <h2 style="margin-top: 0; color: #0b3b67;">Key Findings</h2>
+                <ul style="padding-left: 20px; margin: 0;">{{KeyFindingsList}}</ul>
+            </section>
+
+            <section style="background: #ffffff; border: 1px solid #d9e4ef; border-radius: 14px; padding: 18px; margin-bottom: 14px;">
+                <h2 style="margin-top: 0; color: #0b3b67;">Detailed Analysis</h2>
+                <p>{{DetailedAnalysis}}</p>
+            </section>
+
+            <section style="background: #ffffff; border: 1px solid #d9e4ef; border-radius: 14px; padding: 18px; margin-bottom: 14px;">
+                <h2 style="margin-top: 0; color: #0b3b67;">Business Implications</h2>
+                <p>{{BusinessImplications}}</p>
+            </section>
+
+            <section style="background: #ffffff; border: 1px solid #d9e4ef; border-radius: 14px; padding: 18px; margin-bottom: 14px;">
+                <h2 style="margin-top: 0; color: #0b3b67;">Source Highlights</h2>
+                <ul style="padding-left: 20px; margin: 0;">{{SourceHighlightsListWithLinks}}</ul>
+            </section>
+
+            <section style="background: #ffffff; border: 1px solid #d9e4ef; border-radius: 14px; padding: 18px; margin-bottom: 14px;">
+                <h2 style="margin-top: 0; color: #0b3b67;">Conclusion</h2>
+                <p>{{Conclusion}}</p>
+            </section>
+
+            <footer style="margin-top: 10px; padding: 14px; border-radius: 12px; background: #fff7ed; border: 1px solid #fed7aa; color: #7c2d12; font-size: 13px;">
+                <strong>Evidence & Limitations:</strong> {{LimitationsNote}}
+            </footer>
+        </article>
+
+    REVISION FEEDBACK (apply if present, otherwise ignore):
+    {revision_feedback}
 
     TRENDS & ANALYSIS:
     {analyst_insight}
@@ -189,42 +289,3 @@ def writer_node(state: AgentState):
     response = llm.invoke(prompt)
     print(f"   > Writer response received.")
     return {"messages": [response]}
-
-# --- 3. Build the Graph ---
-# Use StateGraph to define the nodes and how they connect.
-workflow = StateGraph(AgentState)
-
-# Add Nodes
-workflow.add_node("Researcher", researcher_node)
-workflow.add_node("Analyst", analyst_node)
-workflow.add_node("Writer", writer_node)
-
-# Add Edges (Define the linear flow)
-# Start -> Researcher -> Analyst -> Writer -> End.
-workflow.set_entry_point("Researcher")
-workflow.add_edge("Researcher", "Analyst")
-workflow.add_edge("Analyst", "Writer")
-workflow.add_edge("Writer", END)
-
-# Compile the graph
-from langgraph.checkpoint.memory import MemorySaver
-
-memory = MemorySaver()
-
-app = workflow.compile(
-    checkpointer=memory
-)
-
-# --- 4. Runnable Test Block ---
-if __name__ == "__main__":
-    user_topic = "latest AI trends and internal productivity reports"
-    print(f"Starting NewsNexus Agent Team on topic: '{user_topic}'...")
-    
-    inputs = {"messages": [HumanMessage(content=user_topic)], "research_data": []}
-    
-    # Run the graph and stream the output
-    for output in app.stream(inputs):
-        pass # The nodes will print their own status
-    
-    print("\n\n=== FINAL NEWSLETTER (HTML) ===")
-    print(output['Writer']['messages'][-1].content)
