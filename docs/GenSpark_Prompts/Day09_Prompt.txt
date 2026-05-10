@@ -1,0 +1,104 @@
+Generate a PowerPoint presentation for: "Project Phase 1 - Memory & Persistence"
+
+PROJECT CONTEXT: NewsNexus integrates persistent memory to avoid re-researching the same topics. This Day 9 teaches long-term memory patterns and archive strategies.
+
+PRESENTATION STRUCTURE:
+1. Title Slide: "Day 9: Project Phase 1 - Memory & Persistence"
+2. Slide: Why Memory Matters
+   - User asks about "Climate Policy" on Monday
+   - User asks about "Environmental Regulations" on Wednesday (related topic)
+   - Without memory: Re-research everything (wasteful)
+   - With memory: "I recall similar analysis from Monday → reuse + adapt"
+3. Slide: Memory Architecture
+   - Separate ChromaDB collection: data/archive_memory/
+   - Each entry: (topic_query, analysis_summary, timestamp)
+   - Similarity threshold: 0.4 = "similar enough to use as context"
+4. Slide: Memory Check in Researcher (EXACT CODE BLOCK)
+   ```python
+   # From: src/phase5_final.py line 30
+   def researcher_with_memory_node(state: AgentState):
+       last_message = state["messages"][0]
+       user_topic = last_message.content
+       
+       memory_context = memory_store.check_memory(user_topic)
+       
+       system_prompt = f"""...
+       CRITICAL MEMORY CONTEXT:
+       {memory_context}
+       ..."""
+       
+       response = llm_with_tools.invoke([
+           SystemMessage(content=system_prompt), 
+           last_message
+       ])
+   ```
+   Teaching Point: Memory injected into researcher prompt before tool calls
+5. Slide: Memory Store API (EXACT CODE BLOCK)
+   ```python
+   # From: src/memory_store.py line 11
+   class MemoryStore:
+       def save_memory(self, topic: str, summary: str):
+           # Store (topic, summary) in archive ChromaDB
+       
+       def check_memory(self, topic: str) -> str:
+           # Search archive: similar_search(topic, k=1)
+           # if score < 0.4: return "No prior analysis"
+           # else: return "I found a similar analysis from [date]: [summary]"
+   ```
+6. Slide: Memory Workflow
+   - Query enters Researcher
+   - Researcher calls memory_store.check_memory()
+   - If found: Inject past analysis into prompt
+   - Researcher: "Use memory as context, gather any new facts"
+   - On approval: Call memory_store.save_memory() to archive
+7. Slide: Archive Structure
+   - Location: data/archive_memory/chroma.sqlite3
+   - Metadata: topic, summary, timestamp, source docs
+   - Persistence: Survives app restarts
+8. Slide: Memory Update Workflow
+   ```text
+   Query 1: "Climate Policy" 
+   → Researcher → Analyst → Writer 
+   → User approves → memory_store.save_memory("Climate Policy", analysis)
+   
+   Query 2: "Environmental Rules" (similar to Query 1)
+   → memory_store.check_memory() 
+   → Finds Query 1 analysis with score 0.6 
+   → Injects: "Prior analysis: [summary]" into Researcher prompt
+   → Researcher builds on prior analysis
+   ```
+9. Slide: Phase 1 Deliverables
+   - ✓ Memory store implemented and integrated
+   - ✓ Researcher reads from memory before researching
+   - ✓ Memory saves on human approval
+   - ✓ Archive grows over time
+10. Slide: Phase 1 Evaluation
+    - Test 1: Same query on day 1 and day 2 → should use memory
+    - Test 2: Related but different query → should find memory and adapt
+    - Test 3: Unrelated query → should report "No prior"
+    - Test 4: Restart app → memory persists
+11. Slide: Development Planning Checklist (Whiteboard Live)
+    - ✓ Problem statement: "Avoid re-researching similar topics"
+    - ✓ Data sources finalized: Internal archive
+    - ✓ Retrieval quality criteria: Similarity > 0.4 = reusable
+    - ✓ Agent output sections defined: Researcher memo format
+    - ✓ Review/approval workflow defined: Memory saves on approve
+12. Slide: The 6-Hour Teaching Timeline
+    - Hour 1: Memory patterns in GenAI (why persistence matters)
+    - Hour 2: ChromaDB collection setup for archive
+    - Hour 3: Implement MemoryStore class
+    - Hour 4: Integrate memory into researcher prompt
+    - Hour 5: Hands-on: Query → approve → check memory on next similar query
+    - Hour 6: Debug memory retrieval (why score is low? Similarity threshold tuning)
+13. Summary Slide: Why This Matters
+    - Skeleton 9 (Memory Layer): Long-term learning from past queries
+    - Memory = efficiency boost + context awareness
+    - User sees: "I remember investigating this before"
+
+VISUAL REQUIREMENTS:
+- Archive directory structure tree
+- Query flow: Check memory → Inject → Respond
+- Timeline: Query 1 (save) → Query 2 (retrieve memory) → Query 3 (new)
+- Color code: Gold for memory hits, Gray for memory misses
+
+OUTPUT FORMAT: 13-15 slides maximum. Include speaker notes with whiteboard checklist.

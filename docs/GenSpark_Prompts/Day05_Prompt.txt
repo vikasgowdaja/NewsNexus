@@ -1,0 +1,89 @@
+Generate a PowerPoint presentation for: "RAG Pipeline (Retrieval-Augmented Generation)"
+
+PROJECT CONTEXT: NewsNexus is fundamentally a RAG system. This Day 5 teaches how retrieved documents prevent LLM hallucination by grounding responses in real data.
+
+PRESENTATION STRUCTURE:
+1. Title Slide: "Day 5: RAG Pipeline"
+2. Slide: The Hallucination Problem
+   - LLM alone: "What does the Climate Policy Act say?" → Model makes up plausible-sounding answer
+   - LLM + RAG: "What does the Climate Policy Act say?" → Model reads actual policy, extracts facts
+   - RAG = Retrieval-Augmented Generation = facts first, then synthesize
+3. Slide: The RAG Trust Model
+   - Source of truth: Internal PDF documents (policies, reports)
+   - Retrieval step: Find relevant documents matching user query
+   - Synthesis step: LLM reads retrieved docs and answers based on them
+   - Citation step: Report where each fact came from
+4. Slide: The Complete RAG Flow (Visual Pipeline)
+   - User Query: "What is the climate policy?"
+   - → Retrieve Step: Find 3 most relevant PDFs (semantic search from Day 4)
+   - → LLM Step: "Here's what the policy says: [from retrieved docs]"
+   - → Citation Step: "Source: page 2 of Climate_Policy.pdf"
+5. Slide: RAG Tool Contract (EXACT CODE BLOCK)
+   ```python
+   # From: src/tools.py line 9
+   @tool
+   def lookup_policy_docs(query: str) -> str:
+       if isinstance(query, str) and "{" in query:
+           query = query.replace("{", "").replace("}", "").replace("value:", "")
+       
+       docs = retrieve_documents(query, k=3)  # Get top 3 relevant docs
+       if not docs:
+           return f"RAG: No relevant internal documents found for query: '{query}'."
+       
+       results = []
+       for doc, score in docs:
+           source_name = doc.metadata.get('source', 'Unknown PDF')
+           basename = os.path.basename(source_name)
+           safe_source_path = source_name.replace('\\', '/')
+           results.append(f"Content: {doc.page_content}\\nSource Link: [{basename}](file:///{safe_source_path})")
+       
+       return "\\n\\n".join(results)
+   ```
+   Teaching Point: Notice the tool ALWAYS returns source link, never hides provenance
+6. Slide: Inside lookup_policy_docs
+   - Input: User query as string
+   - Process: Call retrieve_documents() (from Day 4) to find top 3 semantically similar chunks
+   - Output: Chunk content + source file name + file path
+   - Contract: Always returns source, never synthesizes facts
+7. Slide: Tool Invocation from Agent (EXACT CODE BLOCK)
+   ```python
+   # From: src/agents.py line 50
+   # Researcher node calls tools:
+   response = llm_with_tools.invoke([system_message, user_message])
+   # Model decides to call lookup_policy_docs, web_search_stub, or rss_feed_search
+   ```
+8. Slide: RAG vs No-RAG Comparison
+   - NO RAG: "What's the climate policy?" → Generic 3-point summary (likely hallucinated)
+   - RAG: "What's the climate policy?" → 6-section analysis grounded in actual policy docs
+9. Slide: Edge Cases in RAG
+   - No documents found: Tool returns "No relevant docs found" (honest failure)
+   - Weak match: Top result has low relevance score → Still returned but analyst notes low confidence
+   - Ambiguous query: Multiple docs retrieved → Analyst synthesizes common themes
+10. Slide: The 6-Hour Teaching Timeline
+    - Hour 1: Hallucination discussion with business examples (medical, finance, legal)
+    - Hour 2: Walk through lookup_policy_docs() end-to-end
+    - Hour 3: Trace retrieved chunk and metadata into response
+    - Hour 4: Run same query with/without RAG and compare outputs
+    - Hour 5: Analyze edge cases (no documents, weak matches, contradictions)
+    - Hour 6: Build groundedness rubric for student grading (fact-checking)
+11. Slide: Groundedness Rubric
+    - ✓ Every claim has cited source in retrieved documents
+    - ✓ No facts introduced that aren't in the sources
+    - ✓ Direct quotes marked with quotation marks
+    - ✓ Synthesis is stated as "derived from" not "is stated in"
+12. Slide: RAG Quality Metrics
+    - Retrieval recall: Did we fetch the document that contains the answer?
+    - Retrieval precision: Did we fetch irrelevant documents?
+    - LLM grounding: Did model stay true to retrieved docs?
+13. Summary Slide: Why This Matters
+    - Skeleton 5 (RAG Core): Retrieved docs = source of truth
+    - RAG = enterprise-grade vs generic LLM responses
+    - This is the foundation of Days 6-10 agent orchestration
+
+VISUAL REQUIREMENTS:
+- Flowchart: Query → Retrieve → Synthesize → Cite
+- Side-by-side: No-RAG output vs RAG output
+- Color code: Orange for retrieval, Purple for synthesis, Green for citations
+- Include actual code block on slides (syntax highlighted)
+
+OUTPUT FORMAT: 13-15 slides maximum. Include speaker notes with timing.

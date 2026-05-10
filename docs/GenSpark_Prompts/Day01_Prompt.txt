@@ -1,0 +1,57 @@
+Generate a PowerPoint presentation for: "Intro to GenAI & Setup"
+
+PROJECT CONTEXT: NewsNexus is a local-first Generative AI application that combines RAG (Retrieval-Augmented Generation) with multi-agent orchestration. This Day 1 teaches the foundational system setup required before any model logic.
+
+PRESENTATION STRUCTURE:
+1. Title Slide: "Day 1: Intro to GenAI & Setup"
+2. Slide: System Architecture Overview
+   - Show stack: Python 3.10+ | Ollama (llama3.2, nomic-embed-text) | LangChain | ChromaDB | Streamlit
+   - Emphasis: Local-first = Privacy-first
+3. Slide: The 4 Stages of Setup
+   - Stage A: GenAI architecture orientation (why these components exist)
+   - Stage B: Environment and dependency setup (venv + pip install)
+   - Stage C: Model/runtime preflight checks (ollama list verification)
+   - Stage D: First successful app launch (streamlit run src/streamlit_app.py)
+4. Slide: Critical Dependencies (from requirements.txt)
+   - Show: langchain, langchain-chroma, langchain-ollama, streamlit, duckduckgo_search, feedparser
+5. Slide: Model Contract (EXACT CODE BLOCK)
+   Code to show on slide:
+   ```python
+   # From: run_all.py line 10
+   REQUIRED_MODELS = ("llama3.2", "nomic-embed-text")
+   ```
+   Explain: Generation model (llama3.2) vs Embedding model (nomic-embed-text)
+6. Slide: Preflight Safety Check (EXACT CODE BLOCK)
+   Code to show on slide:
+   ```python
+   # From: run_all.py line 17
+   def check_ollama_available() -> tuple[bool, str]:
+       if shutil.which("ollama") is None:
+           return False, "Ollama CLI was not found on PATH..."
+       # ... validate models exist
+       return True, "Ollama is reachable and required models are installed."
+   ```
+   Teaching Point: Why preflight checks prevent production disasters
+7. Slide: App Bootstrap Point (EXACT CODE)
+   ```python
+   # From: src/streamlit_app.py line 21
+   st.set_page_config(layout="wide", page_title="NewsNexus")
+   ```
+8. Slide: The 6-Hour Teaching Timeline
+   - Hour 1: Concept framing + component dependency graph
+   - Hour 2: Environment lab (venv setup)
+   - Hour 3: Model lab (ollama pull llama3.2, ollama pull nomic-embed-text)
+   - Hour 4: Code walkthrough (run_all.py start to finish)
+   - Hour 5: Execution flow (trace terminal → Streamlit → browser)
+   - Hour 6: Debug clinic (simulate failures + recovery)
+9. Summary Slide: Why This Matters
+   - 80% of early GenAI project failures are setup/runtime failures, not model failures
+   - Skeleton 1 (minimal runnable): requirements.txt → run_all.py → src/streamlit_app.py
+
+VISUAL REQUIREMENTS:
+- Use code highlighting (Python syntax)
+- Include filesystem tree visualization for Skeleton 1 structure
+- Add icons: 🚀 for launch, ✅ for checks, ⚠️ for error scenarios
+- Color code: Green for "checks pass", Red for "missing model"
+
+OUTPUT FORMAT: 10-15 slides maximum. Include speaker notes with timing (1 min per slide typical).

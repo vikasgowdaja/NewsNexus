@@ -1,0 +1,80 @@
+Generate a PowerPoint presentation for: "Embeddings & Semantic Search"
+
+PROJECT CONTEXT: NewsNexus uses vector similarity search to find relevant documents before passing them to the LLM. This Day 4 teaches the chunking → embedding → retrieval pipeline.
+
+PRESENTATION STRUCTURE:
+1. Title Slide: "Day 4: Embeddings & Semantic Search"
+2. Slide: From Keywords to Semantics
+   - Keyword search (old): "Find documents with word 'climate'" = brittle, misses synonyms
+   - Semantic search (modern): "Find documents ABOUT climate change" = flexible, understands meaning
+3. Slide: The Chunking Strategy (EXACT CODE BLOCK)
+   ```python
+   # From: src/ingestion.py line 20
+   text_splitter = RecursiveCharacterTextSplitter(
+       chunk_size=500,
+       chunk_overlap=50,
+       length_function=len,
+       is_separator_regex=False,
+   )
+   chunks = text_splitter.split_documents(raw_documents)
+   ```
+   Why chunk_size=500? Trade-off: enough context (500 chars ≈ 100 words) vs efficient embedding
+   Why overlap=50? Preserve context at chunk boundaries
+4. Slide: Why Chunking Matters
+   - Without chunks: Embed entire 100-page PDF = expensive, slow
+   - With chunks: Embed small sections = fast, granular retrieval
+   - Chunk size too small = loses context
+   - Chunk size too large = expensive embeddings
+5. Slide: Embedding Process
+   - Input: One chunk of text
+   - Process: nomic-embed-text model processes text → outputs 768-dimensional vector
+   - Output: Vector stored in ChromaDB with metadata (source, page number)
+6. Slide: Semantic Similarity Retrieval (EXACT CODE BLOCK)
+   ```python
+   # From: src/retrieval.py line 31
+   results = vector_store.similarity_search_with_score(query, k=k+2)
+   
+   # The score is distance in vector space (lower = more similar)
+   # k+2 means fetch extra results for hybrid search filtering
+   ```
+7. Slide: Hybrid Search with Keyword Boost (EXACT CODE BLOCK)
+   ```python
+   # From: src/retrieval.py line 37
+   for doc, score in results:
+       content = doc.page_content.lower()
+       term_matches = sum(1 for term in query_terms if term in content)
+       boosted_score = score - (term_matches * 0.05)  # Boost exact matches
+   ```
+   Example: Query "climate policy" + exact keyword match in doc = lower score = ranked higher
+8. Slide: Vector Space Visualization
+   - Each embedding is a point in 768-dimensional space (visualize as 2D for humans)
+   - Semantically similar documents cluster near each other
+   - "climate change" and "global warming" are close in vector space
+9. Slide: The 6-Hour Teaching Timeline
+   - Hour 1: Keyword search limitations with examples
+   - Hour 2: Embedding concept (text → 768-dim vector)
+   - Hour 3: Chunking strategy tradeoffs
+   - Hour 4: Hands-on: Chunk a document, embed it, store in ChromaDB
+   - Hour 5: Hands-on: Query and retrieve semantically related documents
+   - Hour 6: Debug clinic (why is wrong document ranked #1? Check boosting logic)
+10. Slide: Chunking Mistakes to Avoid
+    - ❌ Chunk too small (< 100 chars) = broken context
+    - ❌ Chunk too large (> 2000 chars) = expensive embeddings
+    - ❌ No overlap = missing context at boundaries
+    - ✅ 500 chars + 50 overlap = NewsNexus sweet spot
+11. Slide: Performance Optimization
+    - Batch embeddings (embed 100 chunks at once vs 1 at a time)
+    - Use GPU if available (Ollama can offload to GPU)
+    - Cache embeddings (don't re-embed on every query)
+12. Summary Slide: Why This Matters
+    - Skeleton 4 (Retrieval Layer): Semantic search finds relevant docs before LLM
+    - Better retrieval = better grounded responses from LLM
+    - Vector similarity is the foundation of RAG (Day 5)
+
+VISUAL REQUIREMENTS:
+- 2D vector space diagram showing semantic clusters
+- Chunk boundary diagram (overlap visualization)
+- Comparison chart: Keyword vs Semantic search results
+- Timeline: chunk → embed → store → query → retrieve
+
+OUTPUT FORMAT: 12-15 slides maximum. Include speaker notes.

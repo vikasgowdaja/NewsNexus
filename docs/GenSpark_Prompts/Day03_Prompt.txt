@@ -1,0 +1,77 @@
+Generate a PowerPoint presentation for: "Working with Open Models"
+
+PROJECT CONTEXT: NewsNexus uses two Ollama models: llama3.2 (generation) and nomic-embed-text (embeddings). This Day 3 teaches model wiring—how to integrate open-source models into production workflows.
+
+PRESENTATION STRUCTURE:
+1. Title Slide: "Day 3: Working with Open Models"
+2. Slide: Generation vs Embedding Models
+   - Generation Model (llama3.2): Takes text, outputs text (chat responses)
+   - Embedding Model (nomic-embed-text): Takes text, outputs vectors (semantic search)
+   - Why separate? Different optimization objectives
+3. Slide: Model Selection Strategy
+   - llama3.2: Good general-purpose model, ~2GB, ~4GB RAM to run
+   - nomic-embed-text: Lightweight embedder, ~274MB, ~1GB RAM to run
+   - Constraint: Local machine = model size + inference speed tradeoff
+4. Slide: Chat Model Setup (EXACT CODE BLOCK)
+   ```python
+   # From: src/tools.py line 121
+   def get_llm_with_tools():
+       llm = ChatOllama(model="llama3.2", temperature=0)
+       tools = [lookup_policy_docs, web_search_stub, rss_feed_search]
+       llm_with_tools = llm.bind_tools(tools)
+       return llm, llm_with_tools, tools
+   ```
+   Teaching Point: temperature=0 means deterministic (good for production), not creative
+5. Slide: Tool Binding Concept
+   - Model alone: "What do you think about climate?"
+   - Model + tools: "Search for climate facts, analyze them, write report"
+   - bind_tools() tells model which functions it can call
+6. Slide: Embedding Model in Indexing (EXACT CODE BLOCK)
+   ```python
+   # From: src/ingestion.py line 30
+   from langchain_ollama import OllamaEmbeddings
+   embedding_model = OllamaEmbeddings(model="nomic-embed-text")
+   
+   # Later in pipeline:
+   vector_store = Chroma.from_documents(
+       documents=chunks,
+       embedding=embedding_model,
+       persist_directory="data/chroma_db"
+   )
+   ```
+   Flow: PDF → chunks → embed each chunk → store vectors in DB
+7. Slide: Embedding Model in Retrieval (EXACT CODE BLOCK)
+   ```python
+   # From: src/retrieval.py line 20
+   # During search:
+   query_embedding = embedding_model.embed_query("user question")
+   similar_docs = vector_store.similarity_search_with_score(query, k=3)
+   ```
+   Flow: User query → embed query → find nearest vectors → return docs
+8. Slide: Model Verification Checklist
+   - ✓ ollama list (confirms models installed)
+   - ✓ First inference is slow (model loading into RAM)
+   - ✓ Subsequent calls are faster (cached in memory)
+9. Slide: The 6-Hour Teaching Timeline
+   - Hour 1: Generation vs embedding model responsibilities
+   - Hour 2: Model pull demo, ollama list, selection strategy
+   - Hour 3: Trace chat model invocation in tools and agents
+   - Hour 4: Trace embedding usage in indexing and retrieval
+   - Hour 5: Local performance constraints and batching rationale
+   - Hour 6: Runtime failure recovery (missing model, daemon down)
+10. Slide: Common Failures & Recovery
+    - ❌ "Model not found" → Run: ollama pull llama3.2
+    - ❌ "Connection refused" → Ollama daemon not running
+    - ❌ "Out of memory" → Need more RAM or smaller model
+    - ✅ Preflight check (Day 1) prevents these before app starts
+11. Summary Slide: Why This Matters
+    - Skeleton 3 (Model Wiring): Embedding + generation together enable RAG
+    - Open models = no API keys, no rate limits, full local control
+
+VISUAL REQUIREMENTS:
+- Show embedding vector space diagram (2D visualization of semantic space)
+- Model size comparison chart (llama3.2 vs nomic vs other options)
+- Architecture diagram: Model → Tool → Response flow
+- Color code: Purple for models, Blue for tools
+
+OUTPUT FORMAT: 12-15 slides maximum. Include speaker notes.

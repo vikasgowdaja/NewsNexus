@@ -1,0 +1,88 @@
+Generate a PowerPoint presentation for: "Optimization & Evaluation"
+
+PROJECT CONTEXT: NewsNexus demonstrates resilient tool design and evaluation metrics. This Day 8 teaches how to make GenAI systems reliable in production.
+
+PRESENTATION STRUCTURE:
+1. Title Slide: "Day 8: Optimization & Evaluation"
+2. Slide: Reliability in GenAI Systems
+   - Challenge: Tools fail (network down, model timeout, no data found)
+   - Production requirement: Fail gracefully, don't hallucinate
+   - Strategy: Fallback backends, explicit error messages, outage transparency
+3. Slide: The Web Search Failure Problem
+   - DuckDuckGo API returns 403 Forbidden
+   - ❌ WRONG: Treat 403 as "no results" and make up facts
+   - ✅ RIGHT: Report outage explicitly, don't synthesize
+4. Slide: Web Search Resilience (EXACT CODE BLOCK)
+   ```python
+   # From: src/tools.py line 51
+   backend_errors = []
+   backends = ["lite", "html"]
+   
+   for backend in backends:
+       try:
+           with DDGS() as ddgs:
+               results = list(ddgs.text(clean_query, max_results=10, backend=backend))
+           if results:
+               # Process results
+               return formatted_results
+       except Exception as e:
+           backend_errors.append(f"{backend}: {e}")
+   ```
+   Teaching Point: Try multiple backends, don't fail on first error
+5. Slide: Outage-Safe Return (EXACT CODE BLOCK)
+   ```python
+   # From: src/tools.py line 78
+   return (
+       "WEB: Search temporarily unavailable. "
+       "Treat this as a retrieval outage, not as factual evidence about the topic. "
+       f"Debug detail: {' | '.join(backend_errors)}"
+   )
+   ```
+   Teaching Point: Explicit message prevents analyst from fabricating analysis
+6. Slide: Tool Error Handling Philosophy
+   - Contract: Each tool returns a message, never throws uncaught exception
+   - Analyst reads message: "No documents found" vs "Search unavailable" = different handling
+   - Writer includes outage status in final output if needed
+7. Slide: Evaluation Metrics (What to Measure)
+   - Retrieval Quality: Did we fetch relevant documents? (Precision/Recall)
+   - LLM Groundedness: Did model stay true to retrieved docs? (Fact-check)
+   - Response Coherence: Is the output structured and readable? (Pass/Fail)
+   - User Satisfaction: Did the answer help the user? (Feedback)
+8. Slide: Retrieval Precision & Recall
+   - Precision: Of top 3 retrieved docs, how many are relevant?
+   - Recall: Of all relevant docs in the database, did we retrieve any?
+   - Trade-off: Low k = high precision, high k = high recall
+   - NewsNexus chooses k=3 for balance
+9. Slide: Groundedness Scoring
+   - Read final output
+   - Highlight facts → find source
+   - Score: % of facts that are in retrieved documents
+   - Target: 90%+ grounded facts
+10. Slide: Performance Optimization
+    - Batch embeddings: Embed 100 docs at once (faster than 1 at a time)
+    - Cache embeddings: Don't re-embed documents
+    - Use GPU: Ollama can offload embedding to NVIDIA GPU
+    - Monitor: Track inference time per node
+11. Slide: The 6-Hour Teaching Timeline
+    - Hour 1: Reliability vs performance tradeoffs
+    - Hour 2: Walk through web search fallback logic
+    - Hour 3: Hands-on: Break web search, see graceful failure
+    - Hour 4: Build evaluation rubric (groundedness checklist)
+    - Hour 5: Score 5 real outputs using rubric
+    - Hour 6: Optimize: Batch embeddings, measure latency improvement
+12. Slide: Monitoring in Production
+    - Log every tool call: Success? Failure? Response time?
+    - Alert on: Tool failures > 5% of calls, P95 latency > 10s
+    - Dashboard: Show reliability metrics over time
+13. Summary Slide: Why This Matters
+    - Skeleton 8 (Reliability Layer): Systems fail gracefully, don't hallucinate
+    - Evaluation metrics = confidence in production deployments
+    - This makes GenAI suitable for enterprise use
+
+VISUAL REQUIREMENTS:
+- Error flow chart: Try backend 1 → fail → try backend 2 → fail → return outage message
+- Precision vs Recall visualization
+- Performance timeline: Before optimization → After optimization
+- Color code: Red for failures, Green for graceful handling
+
+OUTPUT FORMAT: 12-15 slides maximum. Include speaker notes with rubric templates.

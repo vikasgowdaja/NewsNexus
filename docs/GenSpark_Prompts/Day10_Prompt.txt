@@ -1,0 +1,108 @@
+Generate a PowerPoint presentation for: "Project Phase 2 - Human-in-the-Loop Approval"
+
+PROJECT CONTEXT: NewsNexus integrates human approval gates before archiving analysis. This Day 10 teaches HITL patterns for production quality control.
+
+PRESENTATION STRUCTURE:
+1. Title Slide: "Day 10: Project Phase 2 - Human-in-the-Loop Approval"
+2. Slide: The Quality Control Problem
+   - Fully automated: Risk of low-quality or hallucinated analysis published
+   - Fully manual: Slower but higher quality guarantee
+   - HITL (Human-in-the-Loop): Automated + human approval for critical decisions
+3. Slide: HITL Workflow
+   - Researcher gathers facts (automated)
+   - Analyst synthesizes analysis (automated)
+   - Writer formats output (automated)
+   - Approval Gate: Human reviews and decides: "Publish? Or revise?"
+   - If revise: Send feedback back to Writer (or Researcher if major issues)
+   - If approve: Archive to memory, deliver to user
+4. Slide: LangGraph Interrupts for HITL (EXACT CODE BLOCK)
+   ```python
+   # From: src/phase4_human_loop.py line 22
+   def human_approval_node(state: AgentState):
+       # This node triggers an interrupt
+       # App pauses here, waits for human input
+       pass
+   ```
+   Teaching Point: Interrupt checkpoints pause execution mid-workflow
+5. Slide: Conditional Routing After Approval (EXACT CODE BLOCK)
+   ```python
+   # From: src/phase4_human_loop.py line 30
+   def route_after_human(state: AgentState) -> Literal["Writer", "__end__"]:
+       last_msg = state["messages"][-1].content.lower()
+       
+       if "approve" in last_msg:
+           return "__end__"  # Archive and finish
+       else:
+           return "Writer"   # Back to writer for revision
+   ```
+   Teaching Point: Human feedback → routing decision → conditional execution
+6. Slide: Memory Archive on Approve (EXACT CODE BLOCK)
+   ```python
+   # From: src/phase5_final.py line 151
+   if "approve" in feedback.lower():
+       memory_store.save_memory(user_topic, draft)
+       break  # Exit the HITL loop
+   ```
+   Teaching Point: Only archive on human approval, never on automated output alone
+7. Slide: Full HITL Graph (Visual Diagram)
+   - Entry: Researcher
+   - → Analyst
+   - → Writer
+   - → Human Approval Node (INTERRUPT)
+   - ← If "approve": END (archive to memory)
+   - ← If "revise": Writer (feedback incorporated)
+   - → Repeat approval gate until approved
+8. Slide: Phase 2 Deliverables
+   - ✓ Human approval gate integrated into graph
+   - ✓ Conditional routing based on human feedback
+   - ✓ Memory archive only on approval
+   - ✓ Feedback loop enables iterative refinement
+9. Slide: HITL Metrics
+   - Approval rate: % of outputs approved on first pass
+   - Revision cycles: Average iterations before approval
+   - Time to approval: How long human takes to review
+   - Revision value: Quality improvement from revision
+10. Slide: UI for HITL (Streamlit Integration)
+    - Display draft before approval gate
+    - Show button: [✅ Approve] [❌ Revise with feedback]
+    - Feedback text field for revision requests
+    - Status: "Awaiting human approval"
+11. Slide: Production Considerations
+    - Scale: Who approves when multiple queries arrive?
+    - SLA: How long to wait for approval before timeout?
+    - Archive: What metadata to store with approved analysis?
+    - Feedback: How to track human feedback patterns?
+12. Slide: The 6-Hour Teaching Timeline
+    - Hour 1: HITL concepts and when to use them
+    - Hour 2: LangGraph interrupt checkpoints
+    - Hour 3: Implement human_approval_node + route_after_human
+    - Hour 4: Hands-on: Full workflow with approval, see pause + resume
+    - Hour 5: Add feedback text field, route to Writer
+    - Hour 6: Measure approval metrics, identify systemic revision patterns
+13. Slide: Final System Architecture (Full 10-Day Build)
+    - Day 1: Setup foundation
+    - Day 2-3: Prompts + models
+    - Day 4-5: Retrieval + RAG
+    - Day 6-7: Orchestration + UI
+    - Day 8: Reliability
+    - Day 9: Memory persistence
+    - Day 10: Human approval gates
+    - Result: Production-ready enterprise GenAI system
+14. Slide: Lessons Learned & Best Practices
+    - ✓ Local-first = privacy + no API costs
+    - ✓ Modular pipeline = testable + maintainable
+    - ✓ Explicit error handling = reliability
+    - ✓ Memory + HITL = user trust
+    - ✓ Graph-based orchestration = scalable
+15. Summary Slide: Why This Matters & Next Steps
+    - Complete 10-day curriculum: From setup to production system
+    - NewsNexus = teaching vehicle for real GenAI patterns
+    - Extensions: Add document parsing, multi-format output, API layer
+
+VISUAL REQUIREMENTS:
+- HITL loop diagram: Query → Pipeline → Approval (INTERRUPT) → Feedback → Revision → Approve → Archive
+- Metrics dashboard mockup: Approval rate, revision cycles, time to approval
+- Full system architecture: All 10 days integrated into one diagram
+- Color code: Blue for automation, Orange for human decision, Green for archive
+
+OUTPUT FORMAT: 15-17 slides maximum. Include speaker notes with production deployment tips.

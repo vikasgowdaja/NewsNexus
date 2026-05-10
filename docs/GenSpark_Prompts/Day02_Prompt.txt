@@ -1,0 +1,91 @@
+Generate a PowerPoint presentation for: "Prompt Engineering"
+
+PROJECT CONTEXT: NewsNexus demonstrates real prompt engineering through three distinct agent roles (Researcher, Analyst, Writer). This Day 2 teaches how role-specific prompts eliminate noisy outputs and ensure structured, production-ready responses.
+
+PRESENTATION STRUCTURE:
+1. Title Slide: "Day 2: Prompt Engineering"
+2. Slide: The Prompt Anatomy (4 components)
+   - Component 1: Role definition (What hat does the model wear?)
+   - Component 2: Objective (What is the model's single job?)
+   - Component 3: Constraints (What must/must-not happen?)
+   - Component 4: Output schema (What exact format is expected?)
+3. Slide: From Weak to Strong Prompts
+   - ❌ WEAK: "Write about this topic"
+   - ✅ STRONG: [Show researcher prompt from Day 2 code below]
+4. Slide: The Researcher Role (EXACT CODE BLOCK)
+   ```python
+   # From: src/agents.py line 31
+   sys_msg = SystemMessage(content=f"""You are a data gatherer.
+   The current date is {datetime.now().strftime("%B %d, %Y")}.
+   Use tools to find facts about the user's topic.
+   Do not analyze, just report facts.
+   
+   IMPORTANT QUERY RULES:
+   - If the user message contains an obvious typo or misspelling, 
+     infer the most likely intended topic and use the corrected topic in tool calls.
+   - Example: if the user types 'nauruto', search for 'Naruto'.
+   - Prefer mainstream entity/topic rather than niche crossover result.
+   - Keep tool queries specific and aligned to user's intended topic.
+   
+   ALWAYS use 'lookup_policy_docs', 'web_search_stub', and 'rss_feed_search'.""")
+   ```
+   Teaching Point: Notice the typo-correction rule built into the prompt itself
+5. Slide: The Analyst Role (EXACT CODE BLOCK)
+   Show truncated version of analyst prompt from src/agents.py line 100
+   ```python
+   # Expected output structure (from analyst_node):
+   6 SECTIONS REQUIRED:
+   1. Executive Summary
+   2. Key Findings
+   3. Trend Analysis
+   4. Evidence (with source citations)
+   5. Implications
+   6. Visualization metadata (JSON for Plotly)
+   ```
+6. Slide: The Writer Role (EXACT CODE BLOCK)
+   ```python
+   # From: src/agents.py line 162
+   # Writer prompt ensures output is detailed HTML with semantic tags
+   # Input: Previous agent messages + analysis sections
+   # Output: <article><h1> ... <section> ... </section> ... </article>
+   ```
+7. Slide: Query Normalization in Action (EXACT CODE)
+   ```python
+   # From: src/streamlit_app.py line 221
+   def normalize_topic(raw_topic: str) -> str:
+       cleaned = raw_topic.strip()
+       lower_cleaned = cleaned.lower()
+       typo_map = {
+           "nauruto": "Naruto",
+       }
+       return typo_map.get(lower_cleaned, cleaned)
+   ```
+   Use Case: User types "nauruto" → Normalized to "Naruto" → Passed to agents
+   UI Feedback: "Interpreted topic: Naruto" shown before pipeline starts
+8. Slide: Multi-Role Workflow
+   - Researcher (Output: raw facts + sources)
+   - → Analyst (Output: structured 6-section analysis)
+   - → Writer (Output: formatted HTML article)
+9. Slide: Prompt Quality Evaluation Rubric
+   - ✓ Is the role definition clear and unmistakable?
+   - ✓ Is output format specified (JSON, HTML, structured text)?
+   - ✓ Are constraints (don't do X) explicit?
+   - ✓ Do examples show edge cases?
+10. Slide: The 6-Hour Teaching Timeline
+    - Hour 1: Prompt engineering theory with enterprise examples
+    - Hour 2: Build a weak prompt, observe noisy output
+    - Hour 3: Add role + output constraints, compare quality improvement
+    - Hour 4: Deep dive into analyst prompt sections
+    - Hour 5: Deep dive into writer prompt and HTML layout
+    - Hour 6: Prompt review exercise (students critique each other's prompts)
+11. Summary Slide: Why This Matters
+    - Skeleton 2 (Prompt Layer): Prompt design directly controls output quality
+    - Better prompts = less hallucination, better structure, fewer revisions
+
+VISUAL REQUIREMENTS:
+- Side-by-side comparison: Weak vs Strong prompt output
+- Highlight key phrases in prompts (role, constraints, schema)
+- Show typo-correction path with before/after arrows
+- Color code: Gray for "weak", Green for "strong"
+
+OUTPUT FORMAT: 12-15 slides maximum. Include speaker notes.

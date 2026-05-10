@@ -1,0 +1,98 @@
+Generate a PowerPoint presentation for: "GenAI Applications with Streamlit"
+
+PROJECT CONTEXT: NewsNexus UI is built with Streamlit. This Day 7 teaches how to wrap the LangGraph pipeline in a user-facing web application.
+
+PRESENTATION STRUCTURE:
+1. Title Slide: "Day 7: GenAI Applications (Streamlit UI)"
+2. Slide: UI Layer Purpose
+   - Encapsulates: User input, session state, graph execution, real-time streaming
+   - Handles: Text input, button clicks, display of intermediate results
+   - Manages: State persistence across Streamlit reruns
+3. Slide: Streamlit Basics (Quick Review)
+   - Streamlit = Python framework that rerun on every interaction
+   - Need session_state to persist data across Streamlit reruns
+   - Widgets (text_input, button, etc.) trigger reruns
+4. Slide: Input & State Initialization (EXACT CODE BLOCK)
+   ```python
+   # From: src/streamlit_app.py (example from Day 7 lesson)
+   st.set_page_config(layout="wide", page_title="NewsNexus")
+   
+   if "current_step" not in st.session_state:
+       st.session_state.current_step = "idle"
+       st.session_state.topic = ""
+       st.session_state.messages = []
+       st.session_state.research_data = []
+   ```
+   Teaching Point: Initialize session_state once, never reinitialize on reruns
+5. Slide: Topic Input with Normalization (EXACT CODE BLOCK)
+   ```python
+   # From: src/streamlit_app.py line 343
+   topic = st.text_input("Enter a topic:", placeholder="e.g., Climate Policy")
+   
+   if st.button("🚀 Start Agents", disabled=st.session_state.current_step != "idle") and topic:
+       interpreted_topic = normalize_topic(topic)  # Correct typos
+       st.session_state.topic = topic
+       st.session_state.interpreted_topic = interpreted_topic
+       st.session_state.current_step = "researching"
+       st.session_state.messages = [HumanMessage(content=interpreted_topic)]
+   ```
+   Teaching Point: User types "nauruto" → Normalized to "Naruto" → Passed to agents
+6. Slide: Graph Streaming into UI (EXACT CODE BLOCK)
+   ```python
+   # From: src/streamlit_app.py line 400
+   for event in agent_app.stream(inputs, config):
+       if "Researcher" in event:
+           research_output = event["Researcher"]
+           st.session_state.research_data = research_output.get("research_data", [])
+       
+       if "Analyst" in event:
+           analyst_output = event["Analyst"]
+           st.session_state.chart_data = analyst_output.get("chart_data", [])
+       
+       if "Writer" in event:
+           writer_output = event["Writer"]
+           st.session_state.draft_content = writer_output["messages"][-1].content
+   ```
+   Teaching Point: .stream() yields events as graph executes → update UI in real-time
+7. Slide: Real-Time Status Updates
+   - Placeholder for status: st.empty()
+   - Update as nodes execute: placeholder.info("🔍 Researching...")
+   - Build user confidence that system is working
+8. Slide: Display Results
+   - Research data → Expandable sections
+   - Analysis → 6 sections with sources
+   - HTML content → st.markdown() with unsafe_allow_html=True
+9. Slide: Session State Lifecycle
+   - Idle: Waiting for topic input
+   - Researching: Graph executing, status updates
+   - Analyzing: Analyst node output ready
+   - Writing: Final HTML ready, show publish button
+   - Memory saved: Archive written, ready for next query
+10. Slide: Error Handling in UI
+    - Tool failures (no docs found) → Display gracefully
+    - Model timeouts → Show timeout message, offer retry
+    - Ollama connection lost → Show specific error, recovery steps
+11. Slide: The 6-Hour Teaching Timeline
+    - Hour 1: Streamlit architecture (reruns, session_state, widgets)
+    - Hour 2: Build minimal topic input → button → status display
+    - Hour 3: Connect button to graph.stream() execution
+    - Hour 4: Add real-time status updates during graph execution
+    - Hour 5: Format and display results (research, analysis, HTML)
+    - Hour 6: Debug Streamlit reruns (why does state disappear?)
+12. Slide: Common Streamlit Mistakes
+    - ❌ Initialize session_state on every rerun → lose data
+    - ❌ Call graph.stream() on every widget interaction → waste computation
+    - ❌ Don't check current_step before allowing new queries → confusing UX
+    - ✅ Disable button until previous query completes
+13. Summary Slide: Why This Matters
+    - Skeleton 7 (UI Layer): Streamlit bridges graph → user interaction
+    - Real-time streaming shows users what's happening
+    - Session state persistence = smooth multi-turn workflows
+
+VISUAL REQUIREMENTS:
+- UI mockup: Input field, button, status messages, results
+- State machine diagram: Idle → Researching → Analyzing → Writing → Memory saved
+- Event flow: User click → .stream() events → UI update
+- Color code: Green for active state, Gray for disabled
+
+OUTPUT FORMAT: 12-15 slides maximum. Include speaker notes with UX tips.

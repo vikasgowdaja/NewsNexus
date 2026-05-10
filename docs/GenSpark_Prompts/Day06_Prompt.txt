@@ -1,0 +1,88 @@
+Generate a PowerPoint presentation for: "LangChain & LangGraph Orchestration"
+
+PROJECT CONTEXT: NewsNexus uses LangGraph StateGraph to orchestrate Researcher → Analyst → Writer workflow. This Day 6 teaches how to compose multi-agent systems with LangChain.
+
+PRESENTATION STRUCTURE:
+1. Title Slide: "Day 6: LangChain & LangGraph Orchestration"
+2. Slide: From Sequential Calls to Graph
+   - Before: Script calls model → processes result → calls model again
+   - After: Graph with nodes and edges → state flows through + persists
+   - Why graph? Enables checkpointing, interrupts, conditional routing, parallel execution
+3. Slide: The Shared State (EXACT CODE BLOCK)
+   ```python
+   # From: src/agents.py line 13
+   class AgentState(TypedDict):
+       messages: Annotated[List[BaseMessage], operator.add]
+       research_data: List[str]
+       chart_data: List[dict]
+   ```
+   - messages: List of all conversation turns (accumulates with operator.add)
+   - research_data: Facts gathered by Researcher node
+   - chart_data: Structured data for Plotly from Analyst node
+4. Slide: Node Functions
+   - Researcher Node: Calls tools, updates messages with tool results
+   - Analyst Node: Reads messages, performs reasoning, outputs 6-section analysis
+   - Writer Node: Reads analysis, formats as detailed HTML
+5. Slide: Graph Construction (EXACT CODE BLOCK)
+   ```python
+   # From: src/agents.py line 193
+   workflow = StateGraph(AgentState)
+   workflow.add_node("Researcher", researcher_node)
+   workflow.add_node("Analyst", analyst_node)
+   workflow.add_node("Writer", writer_node)
+   
+   workflow.set_entry_point("Researcher")
+   workflow.add_edge("Researcher", "Analyst")
+   workflow.add_edge("Analyst", "Writer")
+   workflow.add_edge("Writer", END)
+   
+   memory = MemorySaver()
+   app = workflow.compile(checkpointer=memory)
+   ```
+   Teaching Point: Graph is declarative (nodes + edges), execution is compiled
+6. Slide: Execution Flow
+   - Entry: User query enters Researcher node
+   - Node 1: Researcher processes state, calls tools, appends to messages
+   - Edge 1→2: State flows to Analyst
+   - Node 2: Analyst reads all messages, processes analysis, appends
+   - Edge 2→3: State flows to Writer
+   - Node 3: Writer reads all messages, formats HTML, appends
+   - Exit: Final state is checkpointed to memory
+7. Slide: State Accumulation Pattern
+   - operator.add on messages list means: don't replace, append
+   - Researcher appends tool calls: "I found 3 documents"
+   - Analyst appends analysis: "Executive summary: ..."
+   - Writer appends HTML: "<article>...</article>"
+   - Final state has full conversation thread for auditing
+8. Slide: Checkpointing (Interrupts for Human-in-the-Loop)
+   - Compile with: app.compile(checkpointer=memory)
+   - Enables: Pause before approval node, collect human feedback, resume with revised output
+   - Day 10 feature: HITL loop integrated here
+9. Slide: The 6-Hour Teaching Timeline
+   - Hour 1: Graph concepts (nodes, edges, state, entry, exit)
+   - Hour 2: Build minimal 2-node graph (Researcher → Writer)
+   - Hour 3: Add Analyst node, test 3-node workflow
+   - Hour 4: Add conditional edges (if condition → route A else B)
+   - Hour 5: Add checkpointing and interrupts
+   - Hour 6: Debug graph execution (inspect state at each node)
+10. Slide: Debugging Graph Execution
+    - Print state after each node: print(app.get_state(config))
+    - Inspect messages list: How many tool calls? What was synthesized?
+    - Trace edge: Did it route to the expected next node?
+11. Slide: Advanced Features (Teaser for Day 10)
+    - Conditional routing: "If analyst confidence < 0.5, route to Researcher again"
+    - Parallel nodes: "Run multiple tools concurrently"
+    - Interrupts: "Pause before node X for human approval"
+    - Memory: "Persist state across sessions"
+12. Summary Slide: Why This Matters
+    - Skeleton 6 (Orchestration Layer): Graph composes stateless functions into workflows
+    - LangGraph = production-grade workflow engine
+    - Enables complex multi-agent systems with reliability
+
+VISUAL REQUIREMENTS:
+- Graph diagram: 3 nodes (Researcher, Analyst, Writer) with edges
+- State evolution visualization: Show messages list growing at each node
+- Code snippets highlighted on slides
+- Color code: Blue for nodes, Green for edges, Purple for state
+
+OUTPUT FORMAT: 12-15 slides maximum. Include speaker notes.
