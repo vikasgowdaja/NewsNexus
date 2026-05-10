@@ -30,10 +30,17 @@ def researcher_node(state: AgentState):
     last_message = state["messages"][-1]
     
     # Force the researcher persona via system prompt
-    sys_msg = SystemMessage(content=f"""You are a data gatherer. 
-    The current date is {datetime.now().strftime("%B %d, %Y")}. 
-    Use tools to find facts about the user's topic. 
+    sys_msg = SystemMessage(content=f"""You are a data gatherer.
+    The current date is {datetime.now().strftime("%B %d, %Y")}.
+    Use tools to find facts about the user's topic.
     Do not analyze, just report facts.
+
+    IMPORTANT QUERY RULES:
+    - If the user message contains an obvious typo or misspelling, infer the most likely intended topic and use the corrected topic in tool calls.
+    - Example: if the user types 'nauruto', search for 'Naruto'.
+    - Prefer the most likely mainstream entity/topic rather than a niche crossover result.
+    - Keep tool queries specific and aligned to the user's intended topic.
+
     ALWAYS use 'lookup_policy_docs', 'web_search_stub', and 'rss_feed_search' to gather a mix of PDF, Web, and Industry news.""")
     
     # Invoke model
@@ -91,16 +98,36 @@ def analyst_node(state: AgentState):
     
     # Note: We use a standard LLM invocation here (no tools bound)
     # because the Analyst only needs to think, not act.
-    prompt = f"""You are a senior analyst. 
-    1. Identify 3 key trends from the raw data.
-    2. DATA VIZ EXTRACTION: Look for REAL numeric trends (percentages, market sizes, years).
-       If you find numeric data, extract it into a JSON block like this:
-       ```json
-       [{{ "label": "2024", "value": 50 }}, {{ "label": "2025", "value": 75 }}]
-       ```
-    
-    CRITICAL: If the raw data is empty or insufficient, DO NOT make up hypothetical numbers. Only extract data that is EXPLICITLY present.
-    
+    prompt = f"""You are a senior corporate intelligence analyst.
+
+    Your job is to transform the raw research into a detailed, decision-useful analysis.
+
+    Produce the response using these sections:
+    1. Executive Summary
+        - 1 concise paragraph explaining the overall story.
+    2. Key Findings
+        - At least 5 detailed bullet points.
+        - Each point must explain what happened, why it matters, and where the evidence came from.
+    3. Trend Analysis
+        - Explain patterns, shifts, comparisons, risks, or opportunities found in the data.
+    4. Source-backed Evidence
+        - Quote or reference important facts from the raw data.
+    5. Implications
+        - Explain what this means for a business reader.
+    6. DATA VIZ EXTRACTION
+        - Look for REAL numeric trends such as percentages, market sizes, counts, growth rates, or years.
+        - If you find numeric data, extract it into a JSON block like this:
+        ```json
+        [{{ "label": "2024", "value": 50 }}, {{ "label": "2025", "value": 75 }}]
+        ```
+
+    CRITICAL RULES:
+    - Be detailed, specific, and evidence-driven.
+    - Do not write only 3 short trends.
+    - Do not invent facts, figures, or citations.
+    - If evidence is weak, explicitly say what is uncertain.
+    - If the raw data is empty or insufficient, DO NOT make up hypothetical numbers. Only extract data that is EXPLICITLY present.
+
     RAW DATA:
     {raw_data}
     """
@@ -131,12 +158,29 @@ def writer_node(state: AgentState):
     print("\n--- [Agent: Writer] is formatting the newsletter ---")
     analyst_insight = state["messages"][-1].content
     
-    prompt = f"""You are a newsletter editor. 
-    Compile the trends into a polite, professional HTML format.
-    
-    CRITICAL: Preserve all links provided in the analysis (e.g., [Title](URL)).
-    Format them as clickable <a> tags in the HTML.
-    
+    prompt = f"""You are a senior editorial writer for a corporate intelligence platform.
+
+    Convert the analysis into a polished, detailed HTML report.
+
+    The HTML must include these sections:
+    - Title
+    - Executive Summary
+    - Key Findings
+    - Detailed Analysis
+    - Business Implications
+    - Source Highlights
+    - Conclusion
+
+    WRITING RULES:
+    - Make it detailed, not minimal.
+    - Use professional but readable language.
+    - Expand short bullets into meaningful paragraphs where useful.
+    - Preserve all links provided in the analysis (e.g., [Title](URL)).
+    - Convert those links into clickable <a> tags in the HTML.
+    - Use semantic HTML such as <article>, <section>, <h1>, <h2>, <p>, <ul>, and <li>.
+    - Keep the report clean and presentation-ready.
+    - Do not fabricate citations or numbers.
+
     TRENDS & ANALYSIS:
     {analyst_insight}
     """

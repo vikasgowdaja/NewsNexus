@@ -214,6 +214,20 @@ if "draft_content" not in st.session_state:
     st.session_state.draft_content = ""
 if "topic" not in st.session_state:
     st.session_state.topic = ""
+if "interpreted_topic" not in st.session_state:
+    st.session_state.interpreted_topic = ""
+
+
+def normalize_topic(raw_topic: str) -> str:
+    """Normalize obvious user typos to the most likely intended topic."""
+    cleaned = raw_topic.strip()
+    lower_cleaned = cleaned.lower()
+
+    typo_map = {
+        "nauruto": "Naruto",
+    }
+
+    return typo_map.get(lower_cleaned, cleaned)
 
 # --- HTML Sanitizer ---
 _ALLOWED_TAGS = [
@@ -321,6 +335,11 @@ st.markdown('<div class="nn-section-title">Research Brief</div>', unsafe_allow_h
 st.markdown('<div class="nn-section-sub">Define the scope and launch the agent pipeline.</div>', unsafe_allow_html=True)
 topic = st.text_input("Enter Research Topic:", placeholder="e.g., 'Impact of Generative AI on Banking sector 2024'")
 
+if topic.strip():
+    interpreted_topic = normalize_topic(topic)
+    if interpreted_topic != topic.strip():
+        st.info(f"Interpreted topic: **{interpreted_topic}**")
+
 if st.button("🚀 Start Agents", disabled=st.session_state.current_step != "idle") and topic:
     # --- SMART INITIALIZATION LOGIC ---
     db_exists = os.path.exists(DB_PATH) and os.listdir(DB_PATH)
@@ -340,16 +359,18 @@ if st.button("🚀 Start Agents", disabled=st.session_state.current_step != "idl
         st.warning("🌐 No PDFs found. Proceeding with Web Search only.")
     # -------------------------
 
+    interpreted_topic = normalize_topic(topic)
     st.session_state.topic = topic
+    st.session_state.interpreted_topic = interpreted_topic
     st.session_state.current_step = "researching"
-    st.session_state.messages = [HumanMessage(content=topic)]
+    st.session_state.messages = [HumanMessage(content=interpreted_topic)]
     st.session_state.research_data = []
     
     # Initialize Memory Store
     try:
         mem_store = MemoryStore()
         with st.spinner("Checking historical archives..."):
-            past_memory = mem_store.check_memory(topic)
+            past_memory = mem_store.check_memory(interpreted_topic)
     except Exception as e:
         st.error(f"Memory Store failed: {e}")
         st.stop()

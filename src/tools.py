@@ -48,17 +48,15 @@ def web_search_stub(query: str) -> str:
 
     print(f"\n[Tool Called] Live Web Search for: '{clean_query}'")
     
-    try:
-        from duckduckgo_search import DDGS
-        with DDGS() as ddgs:
-            # Try text search first
-            results = list(ddgs.text(clean_query, max_results=10))
-            
-            # If empty, try a news search as fallback
-            if not results:
-                print("   > No text results, trying news search...")
-                results = list(ddgs.news(clean_query, max_results=10))
-                
+    backend_errors = []
+    backends = ["lite", "html"]
+
+    for backend in backends:
+        try:
+            from duckduckgo_search import DDGS
+            with DDGS() as ddgs:
+                results = list(ddgs.text(clean_query, max_results=10, backend=backend))
+
             if results:
                 formatted_results = []
                 for res in results:
@@ -67,10 +65,21 @@ def web_search_stub(query: str) -> str:
                     snippet = res.get("body", res.get("snippet", "No Snippet"))
                     formatted_results.append(f"Title: {title}\nLink: [{title}]({link})\nSnippet: {snippet}")
                 return "\n\n---\n".join(formatted_results)
-            else:
-                return f"WEB: DuckDuckGo returned 0 results for query: '{clean_query}'."
-    except Exception as e:
-        return f"WEB: Error during search: {e}"
+
+            backend_errors.append(f"{backend}: no results")
+        except Exception as e:
+            backend_errors.append(f"{backend}: {e}")
+
+    # Last fallback: return curated RSS findings when live search is blocked.
+    rss_fallback = rss_feed_search.invoke(clean_query)
+    if rss_fallback and not str(rss_fallback).startswith("No matching recent RSS entries found"):
+        return f"WEB: Live DuckDuckGo search unavailable. Using RSS fallback data.\n\n{rss_fallback}"
+
+    return (
+        "WEB: Search temporarily unavailable. "
+        "Treat this as a retrieval outage, not as factual evidence about the topic. "
+        f"Debug detail: {' | '.join(backend_errors)}"
+    )
         
     return "WEB: Unexpected failure in web search tool."
 
