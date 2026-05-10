@@ -20,13 +20,182 @@ DB_PATH = os.path.join(PROJECT_ROOT, "data", "chroma_db")
 # --- Page Config ---
 st.set_page_config(page_title="NewsNexus AI", page_icon="📰", layout="wide")
 
-# --- Custom CSS for "Good HTML" Preview ---
+# --- Premium UI Theme ---
 st.markdown("""
 <style>
-    .main-header {font-size: 2.5rem; color: #1E3A8A; font-weight: bold;}
-    .sub-header {font-size: 1.5rem; color: #4B5563;}
-    .agent-box {border: 1px solid #ddd; padding: 15px; border-radius: 10px; margin-bottom: 10px; background-color: #f9f9f9;}
-    .success-box {background-color: #D1FAE5; padding: 15px; border-radius: 10px; border: 1px solid #10B981;}
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+    :root {
+        --nn-bg-1: #f6f8fc;
+        --nn-bg-2: #eef3ff;
+        --nn-bg-3: #f9fbf2;
+        --nn-ink-1: #0f172a;
+        --nn-ink-2: #334155;
+        --nn-muted: #64748b;
+        --nn-primary: #0a4e9b;
+        --nn-primary-soft: #dbeafe;
+        --nn-accent: #0f766e;
+        --nn-card: rgba(255, 255, 255, 0.86);
+        --nn-card-border: rgba(148, 163, 184, 0.24);
+        --nn-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+    }
+
+    .stApp {
+        background:
+            radial-gradient(circle at 10% 8%, rgba(10, 78, 155, 0.1), transparent 33%),
+            radial-gradient(circle at 88% 14%, rgba(15, 118, 110, 0.11), transparent 34%),
+            linear-gradient(160deg, var(--nn-bg-1) 0%, var(--nn-bg-2) 50%, var(--nn-bg-3) 100%);
+        color: var(--nn-ink-1);
+    }
+
+    .stApp, .stMarkdown, .stTextInput label, .stButton button, .stSubheader, .stTitle {
+        font-family: "Manrope", "Segoe UI", sans-serif !important;
+    }
+
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(7, 32, 64, 0.95) 100%);
+        border-right: 1px solid rgba(148, 163, 184, 0.2);
+    }
+
+    [data-testid="stSidebar"] * {
+        color: #e5e7eb;
+    }
+
+    .nn-side-title {
+        font-size: 1.18rem;
+        font-weight: 800;
+        color: #ffffff;
+        letter-spacing: 0.02em;
+        margin-bottom: 0.35rem;
+    }
+
+    .nn-side-sub {
+        font-size: 0.84rem;
+        color: #94a3b8;
+        margin-bottom: 0.6rem;
+    }
+
+    .nn-hero {
+        background: linear-gradient(127deg, rgba(10, 78, 155, 0.96) 0%, rgba(15, 118, 110, 0.88) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        border-radius: 22px;
+        box-shadow: var(--nn-shadow);
+        padding: 1.4rem 1.45rem 1.2rem 1.45rem;
+        margin: 0.25rem 0 0.9rem 0;
+        color: #f8fafc;
+        animation: nnFadeSlide 0.65s ease-out;
+    }
+
+    .nn-hero h1 {
+        margin: 0;
+        font-size: 2rem;
+        letter-spacing: -0.025em;
+        line-height: 1.16;
+        font-weight: 800;
+        color: #ffffff;
+    }
+
+    .nn-hero p {
+        margin: 0.35rem 0 0.8rem 0;
+        color: rgba(241, 245, 249, 0.96);
+        font-size: 1rem;
+    }
+
+    .nn-chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+    }
+
+    .nn-chip {
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        background: rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        padding: 0.32rem 0.72rem;
+        font-size: 0.8rem;
+        letter-spacing: 0.02em;
+        font-weight: 700;
+        color: #e2e8f0;
+        backdrop-filter: blur(5px);
+    }
+
+    .nn-section-title {
+        margin-top: 0.25rem;
+        color: var(--nn-ink-1);
+        font-size: 1.18rem;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+    }
+
+    .nn-section-sub {
+        color: var(--nn-ink-2);
+        margin-top: -0.12rem;
+        margin-bottom: 0.55rem;
+        font-size: 0.92rem;
+    }
+
+    [data-testid="stTextInput"] > div > div > input {
+        border-radius: 14px;
+        border: 1px solid var(--nn-card-border);
+        background: var(--nn-card);
+        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
+        color: var(--nn-ink-1);
+        font-size: 0.96rem;
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
+    }
+
+    [data-testid="stTextInput"] > div > div > input:focus {
+        border-color: rgba(10, 78, 155, 0.55);
+        box-shadow: 0 0 0 0.16rem rgba(10, 78, 155, 0.16), 0 10px 26px rgba(15, 23, 42, 0.08);
+    }
+
+    .stButton > button {
+        border-radius: 12px;
+        border: 1px solid rgba(10, 78, 155, 0.35);
+        background: linear-gradient(180deg, #0f62ba 0%, #0a4e9b 100%);
+        color: #ffffff;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+        box-shadow: 0 11px 24px rgba(10, 78, 155, 0.24);
+    }
+
+    .stButton > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 16px 30px rgba(10, 78, 155, 0.3);
+    }
+
+    [data-testid="stStatusWidget"],
+    [data-testid="stAlert"],
+    [data-testid="stExpander"] {
+        border-radius: 14px;
+    }
+
+    .nn-success {
+        background: linear-gradient(120deg, rgba(16, 185, 129, 0.17), rgba(20, 184, 166, 0.12));
+        border: 1px solid rgba(15, 118, 110, 0.28);
+        border-radius: 14px;
+        color: #115e59;
+        font-size: 1rem;
+        font-weight: 700;
+        padding: 0.85rem 1rem;
+    }
+
+    code, pre {
+        font-family: "IBM Plex Mono", Consolas, monospace !important;
+    }
+
+    @keyframes nnFadeSlide {
+        from {
+            opacity: 0;
+            transform: translateY(6px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -78,7 +247,8 @@ def export_as_pdf(html_content):
 # --- Sidebar: Data Management ---
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2593/2593240.png", width=80)
-    st.title("NewsNexus Control")
+    st.markdown('<div class="nn-side-title">NewsNexus Control Deck</div>', unsafe_allow_html=True)
+    st.markdown('<div class="nn-side-sub">AI research operations and knowledge orchestration</div>', unsafe_allow_html=True)
     st.divider()
     
     st.subheader("📂 Knowledge Base")
@@ -130,11 +300,25 @@ with st.sidebar:
 
 # --- Main Interface ---
 
-st.markdown('<div class="main-header">📰 NewsNexus: Corporate Intelligence Agent</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">Autonomous Multi-Agent System with Human-in-the-Loop</div>', unsafe_allow_html=True)
+ui_mode_label = 'Hybrid (PDF + Web)' if existing_pdfs else 'Web Search Only'
+db_status_label = 'Knowledge Base Active' if db_ready else 'Knowledge Base Missing'
+st.markdown(
+    f'''<div class="nn-hero">
+        <h1>NewsNexus Corporate Intelligence Studio</h1>
+        <p>Multi-agent research, analysis, and writing with professional review and memory-backed continuity.</p>
+        <div class="nn-chip-row">
+            <span class="nn-chip">{ui_mode_label}</span>
+            <span class="nn-chip">{db_status_label}</span>
+            <span class="nn-chip">Model: Llama 3.2</span>
+        </div>
+    </div>''',
+    unsafe_allow_html=True,
+)
 st.divider()
 
 # Input Area
+st.markdown('<div class="nn-section-title">Research Brief</div>', unsafe_allow_html=True)
+st.markdown('<div class="nn-section-sub">Define the scope and launch the agent pipeline.</div>', unsafe_allow_html=True)
 topic = st.text_input("Enter Research Topic:", placeholder="e.g., 'Impact of Generative AI on Banking sector 2024'")
 
 if st.button("🚀 Start Agents", disabled=st.session_state.current_step != "idle") and topic:
@@ -230,7 +414,8 @@ if st.session_state.current_step == "researching":
 
 # --- Review Stage (Human-in-the-Loop) ---
 if st.session_state.current_step == "reviewing":
-    st.subheader("📝 Draft Review")
+    st.markdown('<div class="nn-section-title">Draft Review Workspace</div>', unsafe_allow_html=True)
+    st.markdown('<div class="nn-section-sub">Inspect findings, validate quality, and decide approval or refinement.</div>', unsafe_allow_html=True)
     
     # Interactive Visualization
     if st.session_state.chart_data:
@@ -285,7 +470,7 @@ if st.session_state.current_step == "reviewing":
 # --- Final Stage ---
 if st.session_state.current_step == "finished":
     st.balloons()
-    st.markdown('<div class="success-box">✅ Newsletter Approved & Archived!</div>', unsafe_allow_html=True)
+    st.markdown('<div class="nn-success">✅ Newsletter approved and archived successfully.</div>', unsafe_allow_html=True)
     
     # Export Options
     col1, col2, col3 = st.columns(3)

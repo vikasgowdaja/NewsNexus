@@ -53,7 +53,7 @@ User in browser
 
 Primary application entry point:
 
-- `streamlit run src/streamlit_app.py`
+- `python -m streamlit run src/streamlit_app.py`
 
 Secondary runnable modules:
 
